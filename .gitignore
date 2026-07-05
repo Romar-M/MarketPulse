@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.venv
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+*.swp
+
+# Environment
+.env
+*.log
+logs/
+
+# Docker
+pgdata/
