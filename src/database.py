@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, DateTime, BigInteger
+from sqlalchemy import Column, String, Float, DateTime, Integer
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from datetime import datetime, timezone
@@ -11,7 +11,7 @@ class Base(DeclarativeBase):
 class Candle(Base):
     __tablename__ = "candles"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     symbol = Column(String, nullable=False)
     timestamp = Column(DateTime(timezone=True), nullable=False)
     open = Column(Float, nullable=False)
