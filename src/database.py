@@ -43,6 +43,7 @@ async def get_recent_candles(session_maker, symbol: str, limit: int = 60):
     try:
         async with session_maker() as session:
             from sqlalchemy import select
+
             stmt = (
                 select(Candle)
                 .where(Candle.symbol == symbol)
@@ -55,6 +56,7 @@ async def get_recent_candles(session_maker, symbol: str, limit: int = 60):
     except Exception as e:
         logger.error(f"Ошибка загрузки свечей: {e}")
         return []
+
 
 async def close_engine(engine):
     """Корректное закрытие соединения с БД."""

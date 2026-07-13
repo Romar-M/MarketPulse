@@ -1,7 +1,13 @@
 import asyncio
 import logging
 from src.config import settings
-from src.database import get_engine, get_session_maker, init_db, get_recent_candles, close_engine
+from src.database import (
+    get_engine,
+    get_session_maker,
+    init_db,
+    get_recent_candles,
+    close_engine,
+)
 from src.alerter import AlertHandler
 from src.analyzer import PriceAnalyzer
 from src.fetcher import DataFetcher
@@ -27,6 +33,7 @@ class GracefulShutdown:
     def is_shutdown_requested(self):
         return self.shutdown_requested
 
+
 async def main():
     # Инициализация БД
     engine = get_engine(settings.database_url)
@@ -47,7 +54,9 @@ async def main():
     # Прогрев буфера из БД
     logger.info("Прогрев буфера из БД...")
     try:
-        recent = await get_recent_candles(session_maker, symbol="ETHUSDT", limit=analyzer.window_size)
+        recent = await get_recent_candles(
+            session_maker, symbol="ETHUSDT", limit=analyzer.window_size
+        )
         if recent:
             for candle in recent:
                 analyzer.add_candle(candle)
@@ -72,8 +81,9 @@ async def main():
     finally:
         logger.info("Очистка ресурсов...")
         await fetcher.disconnect()
-        await close_engine(engine)
+        await engine.dispose()
         logger.info("Приложение остановлено")
+
 
 if __name__ == "__main__":
     try:

@@ -43,12 +43,11 @@ class DataFetcher:
             except asyncio.CancelledError:
                 logger.info("Fetcher cancelled")
                 break
-                except asyncio.CancelledError:
-                logger.info("Fetcher cancelled")
-                break
             except Exception as e:
                 self.reconnect_attempts += 1
-                logger.error(f"WebSocket error: {e} (попытка {self.reconnect_attempts}/{self.max_reconnects})")
+                logger.error(
+                    f"WebSocket error: {e} (попытка {self.reconnect_attempts}/{self.max_reconnects})"
+                )
 
                 if self.reconnect_attempts >= self.max_reconnects:
                     logger.critical("Превышено число попыток реконнекта")

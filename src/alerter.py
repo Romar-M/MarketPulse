@@ -31,13 +31,15 @@ class AlertHandler:
             )
 
             # Сохраняем в историю
-            self.alert_history.append({
-                'time': now,
-                'change_pct': change_pct,
-                'eth_price': eth_price,
-                'btc_price': btc_price,
-                'msg': msg
-            })
+            self.alert_history.append(
+                {
+                    "time": now,
+                    "change_pct": change_pct,
+                    "eth_price": eth_price,
+                    "btc_price": btc_price,
+                    "msg": msg,
+                }
+            )
 
             logger.info(msg)
             print(msg)

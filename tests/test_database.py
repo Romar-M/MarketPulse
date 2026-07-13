@@ -41,15 +41,17 @@ async def test_get_recent_candles_ordering(engine_and_session):
     engine, session_maker = engine_and_session
     async with session_maker() as session:
         for i in range(5):
-            session.add(Candle(
-                symbol="BTCUSDT",
-                timestamp=datetime(2026, 7, 5, 12, i, tzinfo=timezone.utc),
-                open=30000 + i,
-                high=30010 + i,
-                low=29990 + i,
-                close=30005 + i,
-                volume=10.0,
-            ))
+            session.add(
+                Candle(
+                    symbol="BTCUSDT",
+                    timestamp=datetime(2026, 7, 5, 12, i, tzinfo=timezone.utc),
+                    open=30000 + i,
+                    high=30010 + i,
+                    low=29990 + i,
+                    close=30005 + i,
+                    volume=10.0,
+                )
+            )
         await session.commit()
 
     candles = await get_recent_candles(session_maker, "BTCUSDT", limit=3)

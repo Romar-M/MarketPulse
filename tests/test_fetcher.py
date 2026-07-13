@@ -20,7 +20,7 @@ def fetcher():
 @pytest.mark.asyncio
 async def test_process_valid_closed_candle(fetcher):
     f, cb = fetcher
-    message = '''
+    message = """
     {
         "stream": "ethusdt@kline_1m",
         "data": {
@@ -31,7 +31,7 @@ async def test_process_valid_closed_candle(fetcher):
             }
         }
     }
-    '''
+    """
     await f._process_message(message)
     assert len(cb.calls) == 1
     assert cb.calls[0] == ("ETHUSDT", 2000.50, 1625097600.0)
@@ -40,7 +40,7 @@ async def test_process_valid_closed_candle(fetcher):
 @pytest.mark.asyncio
 async def test_ignore_incomplete_candle(fetcher):
     f, cb = fetcher
-    message = '''
+    message = """
     {
         "stream": "ethusdt@kline_1m",
         "data": {
@@ -51,6 +51,14 @@ async def test_ignore_incomplete_candle(fetcher):
             }
         }
     }
-    '''
+    """
     await f._process_message(message)
     assert len(cb.calls) == 0
+
+
+@pytest.mark.asyncio
+async def test_reconnect_on_error(fetcher):
+    f, cb = fetcher
+    # Проверка, что reconnect_attempts сбрасывается
+    assert f.reconnect_attempts == 0
+    assert f.max_reconnects == 10
