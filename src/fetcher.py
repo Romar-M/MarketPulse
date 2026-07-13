@@ -26,6 +26,8 @@ class DataFetcher:
         self.symbols = [s.lower() for s in symbols]
         self.on_candle = on_candle
         self._ws = None
+        self.reconnect_attempts = 0
+        self.max_reconnects = 10
 
     async def connect(self):
         """Запускает вечное прослушивание WebSocket с авто-переподключением."""
@@ -41,11 +43,22 @@ class DataFetcher:
             except asyncio.CancelledError:
                 logger.info("Fetcher cancelled")
                 break
+                except asyncio.CancelledError:
+                logger.info("Fetcher cancelled")
+                break
             except Exception as e:
-                logger.error(f"WebSocket error: {e}, reconnecting in 5s...")
+                self.reconnect_attempts += 1
+                logger.error(f"WebSocket error: {e} (попытка {self.reconnect_attempts}/{self.max_reconnects})")
+
+                if self.reconnect_attempts >= self.max_reconnects:
+                    logger.critical("Превышено число попыток реконнекта")
+                    break
+
                 await asyncio.sleep(5)
 
     async def _process_message(self, message: str):
+        if not message:
+            return
         """Парсит JSON и вызывает callback, если свеча закрыта."""
         try:
             data = json.loads(message)
@@ -63,3 +76,11 @@ class DataFetcher:
     async def close(self):
         if self._ws:
             await self._ws.close()
+
+    async def disconnect(self):
+        """Корректное отключение WebSocket."""
+        logger.info("🔌 Отключение WebSocket...")
+        if self._ws:
+            await self._ws.close()
+            self._ws = None
+        logger.info("✅ WebSocket отключён")

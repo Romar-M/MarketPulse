@@ -2,8 +2,10 @@ import logging
 from collections import deque
 from datetime import datetime, timezone
 import numpy as np
+import math
 
-logger = logging.getLogger(__name__)
+
+last_recalc_time
 
 
 class PriceAnalyzer:
@@ -15,6 +17,7 @@ class PriceAnalyzer:
     def __init__(self, window_size: int = 60, recalc_interval: int = 300,
                  threshold: float = 0.01, alert_handler=None):
         self.window_size = window_size
+        self.min_data_points = 10
         self.recalc_interval = recalc_interval  # в секундах
         self.threshold = threshold
         self.alert_handler = alert_handler
@@ -22,16 +25,36 @@ class PriceAnalyzer:
         self.eth_prices = deque(maxlen=window_size)
         self.btc_prices = deque(maxlen=window_size)
         self.last_recalc_time: datetime | None = None
+        self.min_data_points = 10
+        self.last_alert_time = 0
+        self.alert_cooldown = 300
         self.beta: float | None = None
 
     async def add_candle(self, symbol: str, close_price: float, timestamp: float):
         """Добавляет новую свечу в соответствующее окно."""
+        # Валидация входных данных
+        if close_price is None or close_price <= 0:
+            logger.warning(f"Некорректная цена {symbol}: {close_price}")
+            return
+
+        if timestamp is None or timestamp <= 0:
+            logger.warning(f"Некорректный timestamp {symbol}: {timestamp}")
+            return
+
         dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+
         if symbol.upper() == "ETHUSDT":
             self.eth_prices.append(close_price)
         elif symbol.upper() == "BTCUSDT":
             self.btc_prices.append(close_price)
         else:
+            logger.warning(f"Неизвестный символ: {symbol}")
+            return
+
+        # Проверка минимального количества данных
+        if len(self.eth_prices) < self.min_data_points or len(self.btc_prices) < self.min_data_points:
+            logger.debug(
+                f"ℹБуфер заполняется: ETH={len(self.eth_prices)}/{self.min_data_points}, BTC={len(self.btc_prices)}/{self.min_data_points}")
             return
 
         # Пересчёт β, если прошло достаточно времени и оба окна заполнены
@@ -39,7 +62,7 @@ class PriceAnalyzer:
             self._recalc_beta()
             self.last_recalc_time = dt
 
-        # Проверка изменения за последние 60 минут
+        # Проверка изменения за последние 60 минут (с защитой от частых алертов)
         await self._check_alert()
 
     def _should_recalc(self, current_time: datetime) -> bool:
@@ -49,24 +72,72 @@ class PriceAnalyzer:
         return elapsed >= self.recalc_interval
 
     def _recalc_beta(self):
-        if len(self.eth_prices) < self.window_size or len(self.btc_prices) < self.window_size:
-            return
-        x = np.array(self.btc_prices)
-        y = np.array(self.eth_prices)
-        # Линейная регрессия: y = α + β*x, возвращает [β, α] для degree=1
-        self.beta = np.polyfit(x, y, 1)[0]
-        logger.debug(f"Recalculated beta: {self.beta:.4f}")
+        """Пересчёт β с защитой от ошибок."""
+        try:
+            # Проверка длины массивов
+            if len(self.eth_prices) < 2 or len(self.btc_prices) < 2:
+                logger.warning("Недостаточно данных для расчёта β")
+                return
+
+            # Берём одинаковое количество данных
+            n = min(len(self.eth_prices), len(self.btc_prices))
+            eth = self.eth_prices[-n:]
+            btc = self.btc_prices[-n:]
+
+            # Расчёт доходностей
+            eth_returns = [(eth[i] - eth[i - 1]) / eth[i - 1] for i in range(1, n)]
+            btc_returns = [(btc[i] - btc[i - 1]) / btc[i - 1] for i in range(1, n)]
+
+            # Защита от пустых массивов
+            if not eth_returns or not btc_returns:
+                logger.warning("Нулевые доходности")
+                return
+
+            # Расчёт ковариации и дисперсии
+            mean_eth = sum(eth_returns) / len(eth_returns)
+            mean_btc = sum(btc_returns) / len(btc_returns)
+
+            cov = sum((e - mean_eth) * (b - mean_btc) for e, b in zip(eth_returns, btc_returns)) / len(eth_returns)
+            var = sum((b - mean_btc)
+            2
+            for b in btc_returns) / len(btc_returns)
+
+            # Защита от деления на ноль
+            if var == 0:
+                logger.warning("Дисперсия BTC = 0, β не определён")
+                return
+
+            beta = cov / var
+
+            # Проверка на бесконечность/NaN
+            if not math.isfinite(beta):
+                logger.warning(f"β = {beta} (не число)")
+                return
+
+            self.beta = beta
+            logger.info(f"β = {beta:.4f} (на {len(eth_returns)} точках)")
+
+        except Exception as e:
+            logger.error(f"Ошибка расчёта β: {e}")
 
     async def _check_alert(self):
-        if self.beta is None or len(self.eth_prices) < 2:
+        """Проверка с защитой от частых алертов."""
+        import time
+        now = time.time()
+
+        # Защита от частых алертов
+        if now - self.last_alert_time < self.alert_cooldown:
             return
-        # Нужна цена 60 минут назад – первый элемент в deque
-        eth_now = self.eth_prices[-1]
-        eth_60m_ago = self.eth_prices[0]
-        btc_now = self.btc_prices[-1] if self.btc_prices else 0
-        btc_60m_ago = self.btc_prices[0] if self.btc_prices else 0
-        if eth_60m_ago == 0:
+
+        if self.beta is None:
             return
+
+        # Здесь твоя логика проверки
+        # Например:
+        if abs(self.beta) > 0.5:  # порог
+            self.last_alert_time = now
+            logger.info(f"Алерт: β = {self.beta:.4f}")
+            # Здесь можно вызвать alerter.trigger()
 
         delta_eth = eth_now - eth_60m_ago
         delta_btc = btc_now - btc_60m_ago
