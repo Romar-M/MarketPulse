@@ -2,6 +2,9 @@ from sqlalchemy import Column, String, Float, DateTime, Integer
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from datetime import datetime, timezone
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -37,14 +40,24 @@ async def init_db(engine):
 
 async def get_recent_candles(session_maker, symbol: str, limit: int = 60):
     """Возвращает последние `limit` свечей для указанного символа, упорядоченных по возрастанию времени."""
-    async with session_maker() as session:
-        from sqlalchemy import select
-        stmt = (
-            select(Candle)
-            .where(Candle.symbol == symbol)
-            .order_by(Candle.timestamp.desc())
-            .limit(limit)
-        )
-        result = await session.execute(stmt)
-        rows = result.scalars().all()
-        return list(reversed(rows))
+    try:
+        async with session_maker() as session:
+            from sqlalchemy import select
+            stmt = (
+                select(Candle)
+                .where(Candle.symbol == symbol)
+                .order_by(Candle.timestamp.desc())
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+            return list(reversed(rows))
+    except Exception as e:
+        logger.error(f"Ошибка загрузки свечей: {e}")
+        return []
+
+async def close_engine(engine):
+    """Корректное закрытие соединения с БД."""
+    logger.info("Закрытие соединения с БД...")
+    await engine.dispose()
+    logger.info("БД отключена")
