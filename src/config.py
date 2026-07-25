@@ -11,10 +11,11 @@ class Settings(BaseSettings):
     db_host: str = "localhost"
     threshold: float = 0.01
     window_minutes: int = 60
+    jwt_secret_key: str = "super-secret-key-change-me"
 
     @property
     def database_url(self) -> str:
-        return f"postgresql+asyncpg://{self.db_user}:{self.db_pass}@{self.db_host}:5432/{self.db_name}"
+        return f"sqlite+aiosqlite:///./marketpulse.db"
 
 
 settings = Settings()
