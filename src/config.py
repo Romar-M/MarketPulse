@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     threshold: float = 0.01
     window_minutes: int = 60
     jwt_secret_key: str = "super-secret-key-change-me"
+    telegram_token: str = ""
+    telegram_chat_id: str = ""
 
     @property
     def database_url(self) -> str:
