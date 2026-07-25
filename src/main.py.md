@@ -1,16 +1,20 @@
+# main.py
+
+_Главный скрипт запуска MarketPulse_
+
 import asyncio
 import logging
-import signal
-import sys
-
 from config import settings
 from database import get_engine, get_session_maker, init_db, get_recent_candles, close_engine
 from alerter import AlertHandler
 from analyzer import PriceAnalyzer, analyzer_instance
 from fetcher import DataFetcher
+import signal
+import sys
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 class GracefulShutdown:
     def __init__(self):
@@ -24,6 +28,7 @@ class GracefulShutdown:
 
     def is_shutdown_requested(self):
         return self.shutdown_requested
+
 
 async def main():
     engine = get_engine(settings.database_url)
@@ -73,9 +78,11 @@ async def main():
         await engine.dispose()
         logger.info("App stopped")
 
+
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except Exception as e:
         logger.error(f"Critical error: {e}")
         sys.exit(1)
+
