@@ -1,15 +1,9 @@
-import asyncio
+﻿import asyncio
 import logging
 from src.config import settings
-from src.database import (
-    get_engine,
-    get_session_maker,
-    init_db,
-    get_recent_candles,
-    close_engine,
-)
+from src.database import get_engine, get_session_maker, init_db, get_recent_candles, close_engine
 from src.alerter import AlertHandler
-from src.analyzer import PriceAnalyzer
+from src.analyzer import PriceAnalyzer, analyzer_instance
 from src.fetcher import DataFetcher
 import signal
 import sys
@@ -19,8 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 class GracefulShutdown:
-    """Корректное завершение по Ctrl+C / SIGTERM"""
-
     def __init__(self):
         self.shutdown_requested = False
         signal.signal(signal.SIGINT, self._handler)
@@ -28,45 +20,43 @@ class GracefulShutdown:
 
     def _handler(self, signum, frame):
         self.shutdown_requested = True
-        logger.warning("Получен сигнал завершения")
+        logger.warning("Shutdown signal received")
 
     def is_shutdown_requested(self):
         return self.shutdown_requested
 
 
 async def main():
-    # Инициализация БД
     engine = get_engine(settings.database_url)
     await init_db(engine)
     session_maker = get_session_maker(engine)
 
-    # Обработчик алертов
-    alerter = AlertHandler(threshold=settings.threshold)
+    alerter = AlertHandler(threshold=settings.threshold, session_maker=session_maker)
 
-    # Анализатор
     analyzer = PriceAnalyzer(
         window_size=settings.window_minutes,
         recalc_interval=300,
         threshold=settings.threshold,
         alert_handler=alerter,
     )
+    analyzer.session_maker = session_maker
+    analyzer_instance.window_size = analyzer.window_size
+    analyzer_instance.threshold = analyzer.threshold
+    analyzer_instance.alert_handler = analyzer.alert_handler
+    analyzer_instance.session_maker = session_maker
 
-    # Прогрев буфера из БД
-    logger.info("Прогрев буфера из БД...")
+    logger.info("Warming up buffer from DB...")
     try:
-        recent = await get_recent_candles(
-            session_maker, symbol="ETHUSDT", limit=analyzer.window_size
-        )
+        recent = await get_recent_candles(session_maker, symbol="ETHUSDT", limit=analyzer.window_size)
         if recent:
             for candle in recent:
                 analyzer.add_candle(candle)
-            logger.info(f"Буфер прогрет: {len(recent)} свечей загружено")
+            logger.info(f"Buffer warmed: {len(recent)} candles loaded")
         else:
-            logger.warning("Нет данных в БД для прогрева")
+            logger.warning("No data in DB for warmup")
     except Exception as e:
-        logger.error(f"Ошибка прогрева буфера: {e}")
+        logger.error(f"Warmup error: {e}")
 
-    # Запуск WebSocket fetcher
     fetcher = DataFetcher(
         symbols=["ethusdt", "btcusdt"],
         on_candle=analyzer.add_candle,
@@ -77,17 +67,17 @@ async def main():
     try:
         await fetcher.connect()
     except KeyboardInterrupt:
-        logger.warning("Завершение по Ctrl+C...")
+        logger.warning("Shutdown by Ctrl+C...")
     finally:
-        logger.info("Очистка ресурсов...")
+        logger.info("Cleaning up...")
         await fetcher.disconnect()
         await engine.dispose()
-        logger.info("Приложение остановлено")
+        logger.info("App stopped")
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except Exception as e:
-        logger.error(f"Критическая ошибка: {e}")
+        logger.error(f"Critical error: {e}")
         sys.exit(1)
