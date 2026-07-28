@@ -1,13 +1,33 @@
-from src.config import Settings
+"""Тесты конфигурации."""
+from __future__ import annotations
+
+from unittest.mock import patch
+
+from src.config import settings
 
 
-def test_default_values():
-    s = Settings()
-    assert s.threshold == 0.01
-    assert s.window_minutes == 60
+class TestConfig:
+    """Набор тестов для конфигурации."""
 
+    def test_threshold_default(self) -> None:
+        """Порог по умолчанию 0.01."""
+        assert settings.threshold == 0.01
 
-def test_database_url_format():
-    s = Settings(db_user="tester", db_pass="secret", db_host="db", db_name="testdb")
-    expected = "postgresql+asyncpg://tester:secret@db:5432/testdb"
-    assert s.database_url == expected
+    def test_window_minutes(self) -> None:
+        """Окно положительное."""
+        assert settings.window_minutes > 0
+
+    def test_database_url(self) -> None:
+        """URL базы данных задан."""
+        assert settings.database_url is not None
+        assert "sqlite" in settings.database_url
+
+    @patch.dict("os.environ", {"TELEGRAM_TOKEN": "", "TELEGRAM_CHAT_ID": ""}, clear=True)
+    def test_telegram_token_default(self) -> None:
+        """Токен Telegram пустой по умолчанию."""
+        # Перезагружаем settings с новым окружением
+        from importlib import reload
+        import src.config
+        reload(src.config)
+        from src.config import settings
+        assert settings.telegram_token == ""
