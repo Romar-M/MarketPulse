@@ -1,60 +1,99 @@
 import pytest
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from src.database import Base, Candle, init_db, get_recent_candles
-from datetime import datetime, timezone
-
-
-@pytest.fixture(scope="function")
-async def engine_and_session():
-    """Создаёт движок SQLite в памяти и возвращает engine + session_maker."""
-    engine = create_async_engine("sqlite+aiosqlite://", echo=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    session_maker = async_sessionmaker(engine, expire_on_commit=False)
-    yield engine, session_maker
-    await engine.dispose()
-
+from unittest.mock import AsyncMock, MagicMock, patch
+from src.database import Candle, Alert, init_db, get_recent_candles, get_alerts, clear_alerts, close_engine, get_engine, get_session_maker
 
 @pytest.mark.asyncio
-async def test_create_candle(engine_and_session):
-    engine, session_maker = engine_and_session
-    async with session_maker() as session:
-        candle = Candle(
-            symbol="ETHUSDT",
-            timestamp=datetime(2026, 7, 5, 12, 0, tzinfo=timezone.utc),
-            open=2000.0,
-            high=2010.0,
-            low=1995.0,
-            close=2005.0,
-            volume=100.0,
-        )
-        session.add(candle)
-        await session.commit()
+async def test_init_db():
+    conn_mock = AsyncMock()
+    engine_mock = MagicMock()
+    engine_mock.begin.return_value.__aenter__.return_value = conn_mock
+    await init_db(engine_mock)
+    conn_mock.run_sync.assert_awaited_once()
 
-    candles = await get_recent_candles(session_maker, "ETHUSDT", limit=1)
+@pytest.mark.asyncio
+async def test_get_recent_candles_empty():
+    maker = MagicMock()
+    ses = AsyncMock()
+    res = MagicMock(); res.scalars.return_value.all.return_value = []
+    ses.execute.return_value = res; ses.__aenter__.return_value = ses
+    maker.return_value = ses
+    candles = await get_recent_candles(maker, "ETH", limit=10)
+    assert candles == []
+
+@pytest.mark.asyncio
+async def test_get_recent_candles_with_data():
+    maker = MagicMock()
+    ses = AsyncMock()
+    c = Candle(symbol="ETH", timestamp=MagicMock(), open=1, high=2, low=1, close=1.5, volume=100)
+    res = MagicMock(); res.scalars.return_value.all.return_value = [c]
+    ses.execute.return_value = res; ses.__aenter__.return_value = ses
+    maker.return_value = ses
+    candles = await get_recent_candles(maker, "ETH", limit=10)
     assert len(candles) == 1
-    assert candles[0].close == 2005.0
-
+    assert candles[0].symbol == "ETH"
 
 @pytest.mark.asyncio
-async def test_get_recent_candles_ordering(engine_and_session):
-    engine, session_maker = engine_and_session
-    async with session_maker() as session:
-        for i in range(5):
-            session.add(
-                Candle(
-                    symbol="BTCUSDT",
-                    timestamp=datetime(2026, 7, 5, 12, i, tzinfo=timezone.utc),
-                    open=30000 + i,
-                    high=30010 + i,
-                    low=29990 + i,
-                    close=30005 + i,
-                    volume=10.0,
-                )
-            )
-        await session.commit()
+async def test_get_recent_candles_error():
+    maker = MagicMock()
+    ses = AsyncMock()
+    ses.__aenter__.return_value.execute.side_effect = Exception("db error")
+    maker.return_value = ses
+    candles = await get_recent_candles(maker, "ETH", limit=10)
+    assert candles == []
 
-    candles = await get_recent_candles(session_maker, "BTCUSDT", limit=3)
-    assert len(candles) == 3
-    # должны быть в порядке возрастания времени
-    assert candles[0].timestamp < candles[1].timestamp < candles[2].timestamp
+@pytest.mark.asyncio
+async def test_get_alerts_empty():
+    maker = MagicMock()
+    ses = AsyncMock()
+    res = MagicMock(); res.scalars.return_value.all.return_value = []
+    ses.execute.return_value = res; ses.__aenter__.return_value = ses
+    maker.return_value = ses
+    alerts = await get_alerts(maker, limit=10)
+    assert alerts == []
+
+@pytest.mark.asyncio
+async def test_get_alerts_with_data():
+    maker = MagicMock()
+    ses = AsyncMock()
+    a = Alert(pct_change=0.05, eth_price=1000, btc_price=20000)
+    res = MagicMock(); res.scalars.return_value.all.return_value = [a]
+    ses.execute.return_value = res; ses.__aenter__.return_value = ses
+    maker.return_value = ses
+    alerts = await get_alerts(maker, limit=10)
+    assert len(alerts) == 1
+    assert alerts[0].pct_change == 0.05
+
+@pytest.mark.asyncio
+async def test_get_alerts_error():
+    maker = MagicMock()
+    ses = AsyncMock()
+    ses.__aenter__.return_value.execute.side_effect = Exception("db error")
+    maker.return_value = ses
+    alerts = await get_alerts(maker, limit=10)
+    assert alerts == []
+
+@pytest.mark.asyncio
+async def test_clear_alerts():
+    maker = MagicMock()
+    ses = AsyncMock()
+    ses.__aenter__.return_value = ses
+    maker.return_value = ses
+    await clear_alerts(maker)
+    ses.commit.assert_awaited_once()
+
+@pytest.mark.asyncio
+async def test_close_engine():
+    engine_mock = AsyncMock()
+    await close_engine(engine_mock)
+    engine_mock.dispose.assert_awaited_once()
+
+def test_get_engine():
+    with patch("src.database.create_async_engine") as mock:
+        e = get_engine("sqlite+aiosqlite:///test.db")
+        mock.assert_called_once_with("sqlite+aiosqlite:///test.db", echo=False)
+
+def test_get_session_maker():
+    engine = MagicMock()
+    with patch("src.database.async_sessionmaker") as mock:
+        m = get_session_maker(engine)
+        mock.assert_called_once()

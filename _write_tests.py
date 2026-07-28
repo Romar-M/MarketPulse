@@ -10,7 +10,7 @@ import pytest
 def handler():
     """Экземпляр AlertHandler с пустыми токенами (без отправки)."""
     with patch("src.telegram_bot.TOKEN", ""), patch("src.telegram_bot.CHAT_ID", ""):
-        from src.alerter import AlertHandler
+        from src.database import AlertHandler
         yield AlertHandler(threshold=0.01, min_interval=300)
 
 

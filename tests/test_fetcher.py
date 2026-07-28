@@ -1,64 +1,104 @@
+"""Тесты загрузчика данных."""
+from __future__ import annotations
+
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+import json
+
 from src.fetcher import DataFetcher
 
 
-class MockCallback:
-    def __init__(self):
-        self.calls = []
-
-    async def on_candle(self, symbol: str, price: float, timestamp: float):
-        self.calls.append((symbol, price, timestamp))
-
-
-@pytest.fixture
-def fetcher():
-    cb = MockCallback()
-    f = DataFetcher(symbols=["ethusdt"], on_candle=cb.on_candle)
-    return f, cb
-
-
 @pytest.mark.asyncio
-async def test_process_valid_closed_candle(fetcher):
-    f, cb = fetcher
-    message = """
-    {
+async def test_process_message_normal() -> None:
+    """Обычное сообщение с закрытой свечой."""
+    callback = AsyncMock()
+    fetcher = DataFetcher(symbols=["ethusdt", "btcusdt"], on_candle=callback)
+    msg = json.dumps({
         "stream": "ethusdt@kline_1m",
         "data": {
             "kline": {
-                "x": true,
-                "c": "2000.50",
-                "T": 1625097600000
+                "x": True,
+                "c": "50000.00",
+                "T": 1000000000000,
             }
         }
-    }
-    """
-    await f._process_message(message)
-    assert len(cb.calls) == 1
-    assert cb.calls[0] == ("ETHUSDT", 2000.50, 1625097600.0)
+    })
+    await fetcher._process_message(msg)
+    callback.assert_awaited_once_with("ETHUSDT", 50000.0, 1000000000.0)
 
 
 @pytest.mark.asyncio
-async def test_ignore_incomplete_candle(fetcher):
-    f, cb = fetcher
-    message = """
-    {
+async def test_process_message_not_closed() -> None:
+    """Незакрытая свеча игнорируется."""
+    callback = AsyncMock()
+    fetcher = DataFetcher(symbols=["ethusdt"], on_candle=callback)
+    msg = json.dumps({
         "stream": "ethusdt@kline_1m",
         "data": {
             "kline": {
-                "x": false,
-                "c": "2000.50",
-                "T": 1625097600000
+                "x": False,
+                "c": "50000.00",
+                "T": 1000000000000,
             }
         }
-    }
-    """
-    await f._process_message(message)
-    assert len(cb.calls) == 0
+    })
+    await fetcher._process_message(msg)
+    callback.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_reconnect_on_error(fetcher):
-    f, cb = fetcher
-    # Проверка, что reconnect_attempts сбрасывается
-    assert f.reconnect_attempts == 0
-    assert f.max_reconnects == 10
+async def test_process_message_empty() -> None:
+    """Пустое сообщение игнорируется."""
+    callback = AsyncMock()
+    fetcher = DataFetcher(symbols=["ethusdt"], on_candle=callback)
+    await fetcher._process_message("")
+    callback.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_process_message_malformed() -> None:
+    """Битое сообщение не вызывает ошибок."""
+    callback = AsyncMock()
+    fetcher = DataFetcher(symbols=["ethusdt"], on_candle=callback)
+    await fetcher._process_message("not json")
+    callback.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_process_message_missing_keys() -> None:
+    """Сообщение без ключей игнорируется."""
+    callback = AsyncMock()
+    fetcher = DataFetcher(symbols=["ethusdt"], on_candle=callback)
+    msg = json.dumps({"stream": "ethusdt@kline_1m", "data": {}})
+    await fetcher._process_message(msg)
+    callback.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_close() -> None:
+    """Закрытие не вызывает ошибок."""
+    callback = AsyncMock()
+    fetcher = DataFetcher(symbols=["ethusdt"], on_candle=callback)
+    await fetcher.close()
+
+
+@pytest.mark.asyncio
+async def test_disconnect() -> None:
+    """Отключение не вызывает ошибок."""
+    callback = AsyncMock()
+    fetcher = DataFetcher(symbols=["ethusdt"], on_candle=callback)
+    await fetcher.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_connect_with_reconnect() -> None:
+    """connect пытается переподключиться при ошибке, затем выходит."""
+    callback = AsyncMock()
+    fetcher = DataFetcher(symbols=["ethusdt"], on_candle=callback)
+    fetcher.max_reconnects = 1
+
+    with patch("src.fetcher.websockets.connect", side_effect=Exception("ws error")):
+        await fetcher.connect()
+        # Достигнут лимит реконнектов — вышли без ошибки
+        assert fetcher.reconnect_attempts >= 1
