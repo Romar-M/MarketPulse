@@ -3,11 +3,11 @@ import logging
 import signal
 import sys
 
-from config import settings
-from database import get_engine, get_session_maker, init_db, get_recent_candles, close_engine
-from alerter import AlertHandler
-from analyzer import PriceAnalyzer, analyzer_instance
-from fetcher import DataFetcher
+from .config import settings
+from .database import get_engine, get_session_maker, init_db, get_recent_candles, close_engine
+from .alerter import AlertHandler
+from .analyzer import PriceAnalyzer, analyzer_instance
+from .fetcher import DataFetcher
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

@@ -2,9 +2,9 @@ import logging
 from datetime import datetime
 import time
 from collections import deque
+from .telegram_bot import TelegramBot, TOKEN, CHAT_ID
 
-from telegram_bot import TelegramBot, TOKEN, CHAT_ID
-from database import Alert
+from .database import Alert
 
 logger = logging.getLogger(__name__)
 

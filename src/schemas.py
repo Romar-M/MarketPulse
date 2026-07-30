@@ -1,7 +1,30 @@
-"""Pydantic схемы для API."""
-
 from pydantic import BaseModel
 from typing import Optional
+
+
+class CandleResponse(BaseModel):
+    id: int
+    symbol: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+    timestamp: str
+
+
+class AlertResponse(BaseModel):
+    id: int
+    symbol: str
+    alert_type: str
+    message: str
+    price: float
+    timestamp: str
+
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
 
 
 class LoginRequest(BaseModel):
@@ -11,35 +34,17 @@ class LoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
-    token_type: str = "bearer"
+    token_type: str
 
 
-class BetaRequest(BaseModel):
-    ticker: str
-    period: Optional[int] = 30
+class UserResponse(BaseModel):
+    username: str
 
 
-class BetaResponse(BaseModel):
-    ticker: str
-    beta: float
-    period: int
-
-
-class PriceResponse(BaseModel):
-    ticker: str
-    price: float
-    timestamp: str
-
-
-class AlertResponse(BaseModel):
-    id: int
-    ticker: str
-    alert_type: str
-    message: str
-    created_at: str
-
-
-class ExportResponse(BaseModel):
-    ticker: str
-    records: int
-    csv: str
+class RegressionResponse(BaseModel):
+    symbol: str
+    slope: float
+    intercept: float
+    r_squared: float
+    last_price: float
+    trend: str
