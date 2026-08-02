@@ -24,7 +24,7 @@ class CircuitBreaker:
 
     async def call(self, coro):
         if self.state == CircuitState.OPEN:
-            if datetime.utcnow() - self.last_failure_time > timedelta(seconds=self.recovery_timeout):
+            if datetime.utcnow() - self.last_failure_time >= timedelta(seconds=self.recovery_timeout):
                 self.state = CircuitState.HALF_OPEN
                 logger.info("Circuit: OPEN -> HALF_OPEN")
             else:

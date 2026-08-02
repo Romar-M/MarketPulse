@@ -17,7 +17,7 @@ async def test_process_message_normal() -> None:
     msg = json.dumps({
         "stream": "ethusdt@kline_1m",
         "data": {
-            "kline": {
+            "k": {
                 "x": True,
                 "c": "50000.00",
                 "T": 1000000000000,
@@ -36,7 +36,7 @@ async def test_process_message_not_closed() -> None:
     msg = json.dumps({
         "stream": "ethusdt@kline_1m",
         "data": {
-            "kline": {
+            "k": {
                 "x": False,
                 "c": "50000.00",
                 "T": 1000000000000,

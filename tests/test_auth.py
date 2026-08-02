@@ -13,13 +13,13 @@ class TestAuth:
 
     def test_create_token(self) -> None:
         """Создание токена возвращает строку."""
-        token = create_access_token(data={"sub": "admin"})
+        token = create_access_token("admin", "admin123")
         assert isinstance(token, str)
         assert len(token) > 0
 
     def test_verify_valid_token(self) -> None:
         """Валидный токен содержит переданные данные."""
-        token = create_access_token(data={"sub": "admin", "role": "admin"})
+        token = create_access_token("admin", "admin123")
         payload = verify_token(token)
         assert payload.get("sub") == "admin"
         assert payload.get("role") == "admin"
@@ -32,6 +32,6 @@ class TestAuth:
     def test_verify_expired_token(self) -> None:
         """Истёкший токен возвращает пустой словарь."""
         with patch("src.auth.ACCESS_TOKEN_EXPIRE_MINUTES", -1):
-            token = create_access_token(data={"sub": "admin"})
+            token = create_access_token("admin", "admin123")
             payload = verify_token(token)
             assert payload == {}

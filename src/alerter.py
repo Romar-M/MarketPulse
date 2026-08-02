@@ -33,9 +33,10 @@ class AlertHandler:
                 try:
                     async with self.session_maker() as session:
                         alert = Alert(
-                            pct_change=change_pct,
-                            eth_price=eth_price,
-                            btc_price=btc_price,
+                            symbol="ETHUSDT",
+                            alert_type="divergence",
+                            message=msg,
+                            price=eth_price,
                         )
                         session.add(alert)
                         await session.commit()
