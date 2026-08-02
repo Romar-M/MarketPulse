@@ -28,9 +28,10 @@ class Alert(Base):
     __tablename__ = "alerts"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    pct_change = Column(Float, nullable=False)
-    eth_price = Column(Float, nullable=False)
-    btc_price = Column(Float, nullable=False)
+    symbol = Column(String, nullable=False)
+    alert_type = Column(String, nullable=False, default="divergence")
+    message = Column(String, nullable=False)
+    price = Column(Float, nullable=False)
     timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 def get_engine(database_url: str):

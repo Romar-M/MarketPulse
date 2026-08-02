@@ -55,13 +55,13 @@ async def test_get_alerts_empty():
 async def test_get_alerts_with_data():
     maker = MagicMock()
     ses = AsyncMock()
-    a = Alert(pct_change=0.05, eth_price=1000, btc_price=20000)
+    a = Alert(symbol="ETHUSDT", alert_type="divergence", message="test alert", price=2000.0)
     res = MagicMock(); res.scalars.return_value.all.return_value = [a]
     ses.execute.return_value = res; ses.__aenter__.return_value = ses
     maker.return_value = ses
     alerts = await get_alerts(maker, limit=10)
     assert len(alerts) == 1
-    assert alerts[0].pct_change == 0.05
+    assert alerts[0].symbol == "ETHUSDT"
 
 @pytest.mark.asyncio
 async def test_get_alerts_error():

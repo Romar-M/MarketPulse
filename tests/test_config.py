@@ -19,8 +19,8 @@ class TestConfig:
 
     def test_database_url(self) -> None:
         """URL базы данных задан."""
-        assert settings.database_url is not None
-        assert "sqlite" in settings.database_url
+        assert settings.resolved_database_url is not None
+        assert "sqlite" in settings.resolved_database_url
 
     @patch.dict("os.environ", {"TELEGRAM_TOKEN": "", "TELEGRAM_CHAT_ID": ""}, clear=True)
     def test_telegram_token_default(self) -> None:

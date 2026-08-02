@@ -4,6 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import asyncio
+import time
 import logging
 from datetime import datetime
 
@@ -23,7 +24,7 @@ st.title("📊 MarketPulse Dashboard")
 # Инициализация БД
 @st.cache_resource
 def init_db():
-    engine = get_engine(settings.database_url)
+    engine = get_engine(settings.resolved_database_url)
     return get_session_maker(engine)
 
 session_maker = init_db()
@@ -51,10 +52,10 @@ candles, alerts = asyncio.run(load_data())
 col1, col2, col3, col4 = st.columns(4)
 
 if candles:
-    latest = candles[0]
+    latest = candles[-1]
     prices = [c.close for c in candles]
     beta = run_regression(prices)
-    change = ((prices[0] - prices[-1]) / prices[-1]) * 100 if len(prices) > 1 else 0
+    change = ((prices[-1] - prices[0]) / prices[0]) * 100 if len(prices) > 1 else 0
 
     col1.metric("💰 Цена", f"${latest.close:,.2f}")
     col2.metric("📈 Изменение", f"{change:+.2f}%")
@@ -69,8 +70,8 @@ st.subheader(f"📈 {symbol} — Цена закрытия")
 
 if candles:
     fig_price = go.Figure()
-    timestamps = [datetime.fromtimestamp(c.timestamp) for c in reversed(candles)]
-    closes = [c.close for c in reversed(candles)]
+    timestamps = [c.timestamp for c in candles]
+    closes = [c.close for c in candles]
 
     fig_price.add_trace(go.Scatter(
         x=timestamps, y=closes,
@@ -122,11 +123,12 @@ if alerts:
     alert_data = [
         {
             "ID": a.id,
-            "Изменение %": f"{a.pct_change:.2f}%",
-            "Порог": a.threshold_pct,
-            "Время": datetime.fromtimestamp(a.timestamp).strftime("%H:%M:%S"),
+            "Тип": a.alert_type,
+            "Сообщение": a.message,
+            "Цена": f"${a.price:,.2f}",
+            "Время": a.timestamp.strftime("%H:%M:%S"),
         }
-        for a in reversed(alerts)
+        for a in alerts
     ]
     st.dataframe(alert_data, use_container_width=True, hide_index=True)
 else:
@@ -135,7 +137,5 @@ else:
 # ======================= Автообновление
 if auto_refresh:
     st.sidebar.caption(f"Обновлено: {datetime.now().strftime('%H:%M:%S')}")
-    st.rerun() if st.sidebar.button("🔄 Обновить сейчас") else None
-    import time
     time.sleep(10)
     st.rerun()
